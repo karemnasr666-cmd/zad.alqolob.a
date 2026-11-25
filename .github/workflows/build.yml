@@ -3,9 +3,6 @@ name: Build Zad Al Qolob APK
 on:
   workflow_dispatch:
   push:
-    paths:
-      - 'زاد/**'
-      - '.github/workflows/build.yml'
 
 permissions:
   contents: read
@@ -34,17 +31,36 @@ jobs:
         with:
           gradle-version: '8.9'
 
+      - name: Locate project
+        shell: bash
+        run: |
+          SCRIPT=$(find . -type f -name prepare_offline_data.py | head -n 1)
+
+          if [ -z "$SCRIPT" ]; then
+            echo "Project script not found"
+            find . -maxdepth 4 -type f
+            exit 1
+          fi
+
+          PROJECT_DIR=$(dirname "$(dirname "$SCRIPT")")
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+          echo "Project found: $PROJECT_DIR"
+
       - name: Prepare offline data
-        working-directory: زاد
-        run: python3 scripts/prepare_offline_data.py
+        shell: bash
+        run: |
+          cd "$PROJECT_DIR"
+          python3 scripts/prepare_offline_data.py
 
       - name: Build APK
-        working-directory: زاد/android
-        run: gradle --no-daemon assembleDebug
+        shell: bash
+        run: |
+          cd "$PROJECT_DIR/android"
+          gradle --no-daemon assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: zad-alqolob-apk
-          path: زاد/android/app/build/outputs/apk/debug/app-debug.apk
+          path: ${{ env.PROJECT_DIR }}/android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
